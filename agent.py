@@ -5,25 +5,50 @@ from utils.bresenham import bresenham
 from mapping import LOG_ODDS_FREE, LOG_ODDS_OCC
 from image_pose import ImagePoseEstimator
 import control
+import slam_graph as sg
+import itertools, math
 
 TOP_CAM = dict(camera_id="top", width=128, height=128)
+SIGMA_ODOM_NOISE = 0.01    # m per step
+SIGMA_YAW_NOISE  = 0.01    # rad per step
 
 class Agent:
-    def __init__(self, idx, physics, global_map):
+    _id_iter = itertools.count()
+
+    def __init__(self, idx, physics, global_map, graph: sg.PoseGraph):
         self.id = idx
         self.physics = physics
-        self.body_id = idx  # assumes bodies ordered agent0, agent1…
+        self.body_id = idx
         self.global_map = global_map
         self.frontiers = []
         self.goals = []
-        self.pose = np.array([0.0, 0.0, 0.0])  # x, y, yaw
 
+        # SLAM state
+        self.pose = np.zeros(3)               # current estimate
+        self.last_control = np.zeros(3)       # vx, vy, w
+        self.node_idx = 0                     # incremental node id inside graph
+        self.graph = graph
+        self.graph.add_node(self._node_id(), self.pose)
+
+        self.last_image = None
         self.pose_estimator = ImagePoseEstimator()
 
+    # Helper
+    def _node_id(self):
+        return f"A{self.id}_{self.node_idx}"
+
     # -------------------------------- Sensors -------------------------------- #
-    def _update_true_pose(self):
-        qpos = self.physics.data.qpos[3*self.id : 3*self.id+3]
-        self.pose = qpos.copy()
+    def odom_predict(self, dt):
+        vx, vy = self.last_control[:2]
+        w = self.last_control[2]
+        # Integrate in body frame
+        dx = vx * dt + np.random.randn()*SIGMA_ODOM_NOISE
+        dy = vy * dt + np.random.randn()*SIGMA_ODOM_NOISE
+        dth = w * dt + np.random.randn()*SIGMA_YAW_NOISE
+        c, s = math.cos(self.pose[2]), math.sin(self.pose[2])
+        self.pose[0] += c*dx - s*dy
+        self.pose[1] += s*dx + c*dy
+        self.pose[2] = (self.pose[2] + dth + np.pi) % (2*np.pi) - np.pi
 
     def lidar(self):
         endpoints = ray_cast_2d(self.physics, self.body_id, n_beams=360, max_range=5.0)
@@ -34,22 +59,43 @@ class Agent:
         return img
 
     # ----------------------------- SLAM / Mapping ---------------------------- #
-    def sense_and_update(self):
-        self._update_true_pose()
+    def sense_and_update(self, dt, agents):
+        # 0. motion prediction by odometry
+        self.odom_predict(dt)
+
+        # 1. add odometry edge to graph
+        rel = np.array([self.last_control[0]*dt, self.last_control[1]*dt, self.last_control[2]*dt])
+        if self.node_idx > 0:
+            prev = f"A{self.id}_{self.node_idx-1}"
+            curr = self._node_id()
+            self.graph.add_node(curr, self.pose)
+            info = np.diag([1/(SIGMA_ODOM_NOISE**2)]*2 + [1/(SIGMA_YAW_NOISE**2)])
+            self.graph.add_edge(prev, curr, rel, info)
+        # 2. image capture & loop closure with previous image
+        img = self.capture_top_image()
+        if self.last_image is not None:
+            H = self.pose_estimator.estimate(self.last_image, img)
+            if H is not None:
+                dx, dy = H[0,2], H[1,2]
+                dth = math.atan2(H[1,0], H[0,0])
+                rel_icp = np.array([dx, dy, dth])
+                prev = f"A{self.id}_{self.node_idx-1}"
+                curr = self._node_id()
+                info = np.diag([50, 50, 50])  # higher confidence
+                self.graph.add_edge(prev, curr, rel_icp, info)
+        self.last_image = img.copy()
+
+        # 3. Mapping with current pose
         scan = self.lidar()
         x0, y0, _ = self.pose
-        # Update occupancy along rays
         for (x, y) in scan:
-            # Bresenham in grid coordinates
             pts = bresenham(int(x0*10), int(y0*10), int(x*10), int(y*10))
-            # Free cells
             for gx, gy in pts[:-1]:
                 self.global_map.update_cell(gx*0.1, gy*0.1, is_hit=False)
-            # Hit cell
             hx, hy = pts[-1]
             self.global_map.update_cell(hx*0.1, hy*0.1, is_hit=True)
 
-        # Frontier detection: unknown cells (l=0) touching free cells
+        # 4. Frontier detection
         occ = self.global_map.logodds
         frontiers = []
         it = np.nditer(occ, flags=['multi_index'])
@@ -64,15 +110,18 @@ class Agent:
             it.iternext()
         self.frontiers = frontiers
 
+        self.node_idx += 1
+
     # ------------------------------- Control --------------------------------- #
     def control_step(self, dt):
         if not self.goals:
+            self.last_control[:] = 0
             return
         goal = np.array(self.goals[0])
-        vxy = control.p_controller(self.pose[:2], goal, kp=0.5, vmax=1.0)
-        # Apply velocity to qvel directly (simple)
-        qvel_idx = self.physics.model.jnt_qveladr[3*self.id : 3*self.id+2]
-        self.physics.data.qvel[qvel_idx] = vxy
+        vxy = control.p_controller(self.pose[:2], goal, kp=0.8, vmax=1.5)
+        w = 0.0
+        self.last_control[:] = np.array([vxy[0], vxy[1], w])
+
         # Simple goal reached check
-        if np.linalg.norm(self.pose[:2] - goal) < 0.2:
+        if np.linalg.norm(self.pose[:2] - goal) < 0.3:
             self.goals.pop(0)

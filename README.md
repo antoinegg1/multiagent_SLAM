@@ -1,21 +1,14 @@
 
-# Explorer Project (MuJoCo Multi‑Robot 2‑D Exploration)
+# Explorer Project – **Full‑SLAM Edition**
 
-A minimal, self‑contained prototype of 2‑D frontier exploration with **three robots**, simulated in MuJoCo 3.2.2.
-It demonstrates:
+This variant removes all access to MuJoCo “ground‑truth” poses.  
+Every robot now estimates its own trajectory with **noisy wheel‑odometry ➜ pose‑graph ➜ ORB + RANSAC loop‑closure**, then optimises the graph (Gauss‑Newton via SciPy).
 
-* 360° lidar via MuJoCo ray‑casting  
-* Bayesian occupancy grid mapping (local + global)  
-* Frontier detection + **CBBA** task allocation  
-* Simple P controller with obstacle avoidance  
-* **Image‑based pose alignment** using **ORB + RANSAC** (OpenCV) to mimic real multi‑robot SLAM data fusion  
-
-Run on **Windows 11 (Conda, Python 3.10)** or Linux.  
-GPU is *not* required; real‑time speed on a single CPU core is common.
+Run on Windows 11 + Conda or Linux exactly as before:
 
 ```bash
-conda create -n explorer python=3.10 -y
-conda activate explorer
+conda create -n explorer_slam python=3.10 -y
+conda activate explorer_slam
 
 # Tsinghua mirrors
 conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
@@ -25,27 +18,20 @@ conda config --set show_channel_urls yes
 pip install mujoco==3.2.2 dm_control opencv-python numpy scipy matplotlib tqdm
 ```
 
+> **No external SLAM library needed** – a 40‑line Gauss‑Newton optimiser in `slam_graph.py` handles 2‑D pose‑graphs.
+
 ```bash
-python main.py                 # Launch the demo
+python main.py
 ```
 
 ---
 
-## File Tree (generated)
+## Top‑level Changes vs “mapping only” version
 
-```
-explorer_project/
-├── main.py
-├── maze.xml
-├── explorer_world.py
-├── agent.py
-├── mapping.py
-├── cbba.py
-├── control.py
-├── image_pose.py
-├── utils/
-│   ├── __init__.py
-│   ├── bresenham.py
-│   └── lidar.py
-└── README.md
-```
+| Module | New / Updated | What changed |
+|--------|---------------|--------------|
+| `slam_graph.py` | **NEW** | Minimal pose‑graph container + Gauss‑Newton optimiser |
+| `agent.py` | **UPDATED** | • Integrates **commanded v + Gaussian noise** for odometry<br>• Adds odometry & inter‑robot loop‑closure edges to `slam_graph`<br>• Uses optimised pose to update mapping & control |
+| `explorer_world.py` | updated | Orchestrates global pose‑graph optimisation every N steps |
+
+Everything else (mapping, CBBA, control) stays the same.
