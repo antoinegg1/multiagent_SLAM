@@ -1,4 +1,3 @@
-
 import numpy as np
 from utils.lidar import ray_cast_2d
 from utils.bresenham import bresenham
@@ -115,13 +114,42 @@ class Agent:
     # ------------------------------- Control --------------------------------- #
     def control_step(self, dt):
         if not self.goals:
-            self.last_control[:] = 0
+            self.last_control[:] = 0.0
+            # 也要清零 qvel，防止滑动
+            self._set_qvel([0, 0, 0])
             return
-        goal = np.array(self.goals[0])
-        vxy = control.p_controller(self.pose[:2], goal, kp=0.8, vmax=1.5)
-        w = 0.0
-        self.last_control[:] = np.array([vxy[0], vxy[1], w])
 
-        # Simple goal reached check
+        # ---- 1. 计算期望线速度 / 角速度 ----
+        goal = np.array(self.goals[0])
+        vxy  = control.p_controller(self.pose[:2], goal, kp=0.8, vmax=1.5)
+        # 简单面朝目标
+        desired_yaw = math.atan2(goal[1] - self.pose[1], goal[0] - self.pose[0])
+        yaw_err     = (desired_yaw - self.pose[2] + np.pi) % (2*np.pi) - np.pi
+        w = np.clip(2.0 * yaw_err, -2.0, 2.0)         # P 控制转速
+
+        self.last_control[:] = [vxy[0], vxy[1], w]
+
+        # ---- 2. 把速度写进 MuJoCo ----
+        self._set_qvel([vxy[0], vxy[1], w])
+
+        # ---- 3. 到点就换下一个 frontier ----
         if np.linalg.norm(self.pose[:2] - goal) < 0.3:
             self.goals.pop(0)
+
+    # --------- 工具函数 ----------
+    def _set_qvel(self, vel_xyz):
+        model = self.physics.model
+        qvel  = self.physics.data.qvel
+
+        # 关节 → 对应 DOF 在 qvel 中的起始下标
+        jnt_x   = model.name2id(f"agent{self.id}_x",   "joint")
+        jnt_y   = model.name2id(f"agent{self.id}_y",   "joint")
+        jnt_yaw = model.name2id(f"agent{self.id}_yaw", "joint")
+
+        idx_x   = model.jnt_dofadr[jnt_x]
+        idx_y   = model.jnt_dofadr[jnt_y]
+        idx_yaw = model.jnt_dofadr[jnt_yaw]
+
+        qvel[[idx_x, idx_y, idx_yaw]] = vel_xyz
+
+

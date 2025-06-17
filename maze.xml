@@ -4,8 +4,9 @@
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".2 .3 .4" rgb2=".1 .2 .3"/>
     <material name="floor" texture="grid" texrepeat="20 20"/>
   </asset>
-
+  
   <worldbody>
+    <camera name="top" pos="0 0 12" euler="-90 0 0" fovy="60"/>
     <!-- Floor -->
     <geom name="floor" type="plane" material="floor" size="5 5 .1"/>
 

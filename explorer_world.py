@@ -1,14 +1,18 @@
 
-from dm_control import mjcf, mujoco
+from dm_control import mjcf
 import numpy as np
 from mapping import GlobalMap
 from agent import Agent
 import cbba, slam_graph as sg
-
+import mujoco.viewer 
 class ExplorerWorld:
     def __init__(self, num_agents: int = 3, map_size: float = 10.0, dt: float = 0.1):
         self.mj_model = mjcf.from_path("maze.xml")
-        self.physics = mujoco.Physics.from_mjcf_model(self.mj_model)
+        self.physics = mjcf.Physics.from_mjcf_model(self.mj_model)
+        self.viewer = mujoco.viewer.launch_passive(
+            self.physics.model.ptr,   # MjModel  (dm_control.Physics → .model.ptr)
+            self.physics.data.ptr     # MjData   (dm_control.Physics → .data.ptr)
+        )
         self.dt = dt
 
         self.global_map = GlobalMap(size=map_size, resolution=0.1)
@@ -33,7 +37,12 @@ class ExplorerWorld:
             agent.control_step(self.dt)
 
         # Physics step
-        self.physics.step()
+        if self.viewer.is_running():
+            self.physics.step()
+            self.viewer.sync()  
+
+        else:
+            return 
         self.step_count += 1
 
         # Optimise pose‑graph every 20 steps
