@@ -26,3 +26,4 @@ def allocate(agents):
     # Write allocations back
     for agent in agents:
         agent.goals = assigned.get(agent.id, [])
+    # print(f"[CBBA] agent {agent.id} goals = {agent.goals}")

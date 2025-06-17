@@ -1,0 +1,53 @@
+
+<mujoco model="maze">
+  <asset>
+    <!-- 静态棋盘格 (保留) -->
+    <texture name="grid" type="2d" builtin="checker"
+            width="512" height="512" rgb1=".2 .3 .4" rgb2=".1 .2 .3"/>
+    <material name="floor_grid" texture="grid" texrepeat="20 20"/>
+
+    <!-- ★ 新增：占据图纹理，占位即可，稍后用 Python 覆盖像素 ★ -->
+    <texture name="explore_tex" type="2d" builtin="flat"
+            width="512" height="512" rgb1="1 1 1" rgb2="1 1 1"/>
+    <material name="explore_mat" texture="explore_tex" texrepeat="1 1"/>
+  </asset>
+  
+  <worldbody>
+    <camera name="top" pos="0 0 30" euler="-90 0 0" fovy="60"/>
+    <!-- Floor -->
+    <geom name="floor"  type="plane"  material="explore_mat" size="5 5 .1" group="1"/>
+      <!-- 障碍物：内墙/柱子 -->
+    <geom name="block1" type="box"  pos="0 0.5 0.5" size="1.5 0.1 0.5"  rgba="0.5 0.5 0.5 1"/>
+    <geom name="block2" type="box"  pos="-1.5 -1.5 0.5" size="0.1 1.5 0.5" rgba="0.5 0.5 0.5 1"/>
+    <geom name="block3" type="box" pos="2 2 0.5" size="0.5 0.5 0.5" rgba="0.3 0.3 0.3 1"/>
+    <geom name="obstacle1" type="box"  pos="1 1 0.5" size="0.5 0.5 0.5" rgba="1 0 1 1"/>
+
+    <!-- Outer walls -->
+    <geom name="wall_n" type="box" pos="0  20 .5" size="20 .1 .5" rgba=".6 .6 .6 1"/>
+    <geom name="wall_s" type="box" pos="0 -20 .5" size="20 .1 .5" rgba=".6 .6 .6 1"/>
+    <geom name="wall_e" type="box" pos=" 20 0 .5" size=".1 20 .5" rgba=".6 .6 .6 1"/>
+    <geom name="wall_w" type="box" pos="-20 0 .5" size=".1 20 .5" rgba=".6 .6 .6 1"/>
+
+    <!-- Three robots -->
+    <body name="agent0" pos="-2 -2 .1">
+      <geom type="cylinder" size=".2 .05" rgba="0 0 1 1"/>
+        <joint name="agent0_x" type="slide" axis="1 0 0"/>
+      <joint name="agent0_y" type="slide" axis="0 1 0"/>
+      <joint name="agent0_yaw" type="hinge" axis="0 0 1"/>
+    </body>
+
+    <body name="agent1" pos="2 -2 .1">
+      <geom type="cylinder" size=".2 .05" rgba="0 1 0 1"/>
+      <joint name="agent1_x" type="slide" axis="1 0 0"/>
+      <joint name="agent1_y" type="slide" axis="0 1 0"/>
+      <joint name="agent1_yaw" type="hinge" axis="0 0 1"/>
+    </body>
+
+    <body name="agent2" pos="0 2 .1">
+      <geom type="cylinder" size=".2 .05" rgba="1 0 0 1"/>
+      <joint name="agent2_x" type="slide" axis="1 0 0"/>
+      <joint name="agent2_y" type="slide" axis="0 1 0"/>
+      <joint name="agent2_yaw" type="hinge" axis="0 0 1"/>
+    </body>
+  </worldbody>
+</mujoco>

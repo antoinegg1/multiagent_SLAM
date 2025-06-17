@@ -1,6 +1,13 @@
 
 """Integer Bresenham ray‑tracing for grid occupancy update."""
 
+
+def bresenham_limited(r0, c0, r1, c1, max_cells):
+    """返回从 (r0,c0) 出发、最长 max_cells+1 个格的 Bresenham 路径"""
+    pts = bresenham(r0, c0, r1, c1)
+    if len(pts) > max_cells + 1:
+        return pts[:max_cells + 1]
+    return pts
 def bresenham(x0, y0, x1, y1):
     dx = abs(x1 - x0)
     dy = abs(y1 - y0)

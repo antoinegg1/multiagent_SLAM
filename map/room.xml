@@ -1,0 +1,54 @@
+<mujoco model="room">
+  <asset>
+    <!-- 占据图纹理 -->
+    <texture name="explore_tex" type="2d" builtin="flat" width="512" height="512" rgb1="1 1 1" rgb2="1 1 1"/>
+    <material name="explore_mat" texture="explore_tex" texrepeat="1 1"/>
+  </asset>
+
+  <worldbody>
+    <!-- 摄像头 -->
+    <camera name="top" pos="0 0 -2000" euler="-90 0 -90"/>
+
+    <!-- 地面 -->
+    <geom name="floor" type="plane" size="10 10 .1" material="explore_mat"/>
+
+    <!-- 外围墙 -->
+    <geom type="box" pos=" 0  5 0.5" size="5 0.1 0.5" rgba=".6 .6 .6 1"/> <!-- 北 -->
+    <geom type="box" pos=" 0 -5 0.5" size="5 0.1 0.5" rgba=".6 .6 .6 1"/> <!-- 南 -->
+    <geom type="box" pos="-5  0 0.5" size="0.1 5 0.5" rgba=".6 .6 .6 1"/> <!-- 西 -->
+    <geom type="box" pos=" 5  0 0.5" size="0.1 5 0.5" rgba=".6 .6 .6 1"/> <!-- 东 -->
+
+    <!-- 中间十字墙分房 -->
+    <geom type="box" pos=" 0  0 0.5" size="5 0.1 0.5" rgba="0.3 0.3 0.3 1"/>  <!-- 横向 -->
+    <geom type="box" pos=" 0  0 0.5" size="0.1 5 0.5" rgba="0.3 0.3 0.3 1"/>  <!-- 纵向 -->
+
+    <!-- 留门口 -->
+    <geom type="box" pos=" 0  2.5 0.5" size="0.1 0.5 0.5" rgba="1 1 1 1"/>   <!-- 上门 -->
+    <geom type="box" pos=" 0 -2.5 0.5" size="0.1 0.5 0.5" rgba="1 1 1 1"/>   <!-- 下门 -->
+    <geom type="box" pos=" 2.5 0 0.5" size="0.5 0.1 0.5" rgba="1 1 1 1"/>    <!-- 右门 -->
+    <geom type="box" pos="-2.5 0 0.5" size="0.5 0.1 0.5" rgba="1 1 1 1"/>    <!-- 左门 -->
+
+    <!-- 初始机器人 -->
+    <body name="agent0" pos="-3 -3 0.1">
+      <geom type="cylinder" size=".2 .05" rgba="0 0 1 1"/>
+      <joint name="agent0_x" type="slide" axis="1 0 0"/>
+      <joint name="agent0_y" type="slide" axis="0 1 0"/>
+      <joint name="agent0_yaw" type="hinge" axis="0 0 1"/>
+    </body>
+
+    <body name="agent1" pos="3 -3 0.1">
+      <geom type="cylinder" size=".2 .05" rgba="0 1 0 1"/>
+      <joint name="agent1_x" type="slide" axis="1 0 0"/>
+      <joint name="agent1_y" type="slide" axis="0 1 0"/>
+      <joint name="agent1_yaw" type="hinge" axis="0 0 1"/>
+    </body>
+
+    <body name="agent2" pos="0 3 0.1">
+      <geom type="cylinder" size=".2 .05" rgba="1 0 0 1"/>
+      <joint name="agent2_x" type="slide" axis="1 0 0"/>
+      <joint name="agent2_y" type="slide" axis="0 1 0"/>
+      <joint name="agent2_yaw" type="hinge" axis="0 0 1"/>
+    </body>
+
+  </worldbody>
+</mujoco>
